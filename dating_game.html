@@ -1,20 +1,211 @@
-const items = [
-    // 正確衣著與行為 (要 ✅)
-    { name: "穿襯衫", icon: "👔", want: true },
-    { name: "頭髮整齊", icon: "👦", want: true },
-    { name: "關掉手機", icon: "📴", want: true },
-    { name: "坐得端正", icon: "🪑", want: true },
-    { name: "面帶微笑", icon: "😊", want: true },
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>社交偵探：心動定係感動？</title>
+    <style>
+        body {
+            font-family: 'Microsoft JhengHei', sans-serif;
+            background-color: #f0f8ff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 { color: #2c3e50; margin-bottom: 10px; }
+        .instruction { color: #7f8c8d; margin-bottom: 20px; }
+
+        .game-container {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            max-width: 800px;
+            margin-top: 20px;
+        }
+
+        .bin {
+            width: 300px;
+            height: 200px;
+            border: 4px dashed #bdc3c7;
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: white;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .bin#friendship { border-color: #3498db; color: #3498db; }
+        .bin#love { border-color: #e74c3c; color: #e74c3c; }
+
+        .bin.hover { transform: scale(1.05); background-color: #ecf0f1; }
+
+        .bin h2 { font-size: 2em; margin: 0; }
+
+        #card-container {
+            margin-top: 50px;
+            height: 150px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+
+        .card {
+            width: 280px;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            cursor: grab;
+            text-align: center;
+            font-size: 1.3em;
+            font-weight: bold;
+            border: 2px solid #34495e;
+            user-select: none;
+            touch-action: none;
+        }
+
+        .card:active { cursor: grabbing; }
+
+        #score-board {
+            margin-top: 30px;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        #message {
+            margin-top: 10px;
+            height: 30px;
+            font-weight: bold;
+        }
+
+        .correct { color: #27ae60; }
+        .wrong { color: #e74c3c; }
+        
+        button {
+            margin-top: 20px;
+            padding: 10px 25px;
+            font-size: 1em;
+            background-color: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>社交偵探：心動定係感動？</h1>
+    <p class="instruction">請將牌拉入正確的籃子裡！</p>
+
+    <div class="game-container">
+        <div id="friendship" class="bin" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)">
+            <h2>友情 👬</h2>
+            <p>（廣闊與輕鬆）</p>
+        </div>
+        <div id="love" class="bin" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)">
+            <h2>愛情 💖</h2>
+            <p>（唯一與特別）</p>
+        </div>
+    </div>
+
+    <div id="card-container">
+        <div id="current-card" class="card" draggable="true" ondragstart="drag(event)">
+            載入中...
+        </div>
+    </div>
+
+    <div id="message"></div>
+    <div id="score-board">分數: <span id="score">0</span> / <span id="total">0</span></div>
     
-    // 錯誤衣著與行為 (不要 ❌)
-    { name: "穿拖鞋", icon: "🩴", want: false },      // 與皮鞋外形不同
-    { name: "穿背心", icon: "🎽", want: false },      // 與襯衫對比
-    { name: "大聲講電話", icon: "📲", want: false },   // 行為錯誤
-    { name: "玩電子遊戲", icon: "🎮", want: false },   // 等候期間不應做
-    { name: "在座位睡覺", icon: "😴", want: false },   // 儀態錯誤
-    { name: "吃漢堡包", icon: "🍔", want: false },    // 不應在等候室進食
-    { name: "翹腳坐", icon: "🦵", want: false },      // 姿勢不當
-    { name: "衣服有污漬", icon: "👕", want: false },   // 儀容不潔
-    { name: "戴墨鏡", icon: "🕶️", want: false },      // 不禮貌
-    { name: "遲到", icon: "⏰", want: false }         // 時間觀念
-];
+    <button onclick="resetGame()">重新開始</button>
+
+    <script>
+        const scenarios = [
+            { text: "一班人一齊打機、食飯", type: "friendship" },
+            { text: "單獨約會，而且好想牽對方手", type: "love" },
+            { text: "見到對方同其他人玩會好酸、好妒忌", type: "love" },
+            { text: "對方唔開心，我會安慰佢", type: "friendship" }, // 雖然兩者皆可，但在基礎練習中歸類友情
+            { text: "會同佢分享心事，但佢同邊個玩我唔介意", type: "friendship" },
+            { text: "想每一分每一秒都見到佢，唔想有第三者", type: "love" },
+            { text: "放假想一大班同學去迪士尼", type: "friendship" },
+            { text: "見到佢會面紅耳赤，心跳加速", type: "love" }
+        ];
+
+        let currentCardIndex = 0;
+        let score = 0;
+        let gameScenarios = [];
+
+        function shuffle(array) {
+            return array.sort(() => Math.random() - 0.5);
+        }
+
+        function displayNextCard() {
+            if (currentCardIndex < gameScenarios.length) {
+                const card = document.getElementById('current-card');
+                card.innerText = gameScenarios[currentCardIndex].text;
+                card.style.display = 'block';
+                document.getElementById('message').innerText = "";
+            } else {
+                document.getElementById('current-card').style.display = 'none';
+                document.getElementById('message').innerHTML = "<span class='correct'>完成！你做得好好！</span>";
+            }
+        }
+
+        function allowDrop(ev) {
+            ev.preventDefault();
+            ev.target.closest('.bin').classList.add('hover');
+        }
+
+        function dragLeave(ev) {
+            ev.target.closest('.bin').classList.remove('hover');
+        }
+
+        function drag(ev) {
+            ev.dataTransfer.setData("text", ev.target.id);
+        }
+
+        function drop(ev) {
+            ev.preventDefault();
+            const bin = ev.target.closest('.bin');
+            bin.classList.remove('hover');
+            const binId = bin.id;
+            
+            const correctAnswer = gameScenarios[currentCardIndex].type;
+            const messageEl = document.getElementById('message');
+
+            if (binId === correctAnswer) {
+                score++;
+                messageEl.innerHTML = "<span class='correct'>答對了！✅</span>";
+            } else {
+                messageEl.innerHTML = "<span class='wrong'>再想一想，呢個行為更接近邊種關係？❌</span>";
+            }
+
+            currentCardIndex++;
+            document.getElementById('score').innerText = score;
+            document.getElementById('total').innerText = currentCardIndex;
+            
+            setTimeout(displayNextCard, 1000);
+        }
+
+        function resetGame() {
+            score = 0;
+            currentCardIndex = 0;
+            gameScenarios = shuffle([...scenarios]);
+            document.getElementById('score').innerText = "0";
+            document.getElementById('total').innerText = "0";
+            displayNextCard();
+        }
+
+        // 初始化
+        resetGame();
+    </script>
+</body>
+</html>
